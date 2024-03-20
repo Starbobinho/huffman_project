@@ -35,6 +35,14 @@ A codificação de Huffman é um método de compressão que usa as probabilidade
 > 	Logo depois, basta executar com o seguinte comando:
 > ```
 >         ./zip/zip.exe
+> ```
+>   Para os testes do CUnit se faz necessário a instalação do mesmo, porém na mesma pasta que executou o comando acima pode ser executado o comando abaixo:
+> ```
+>    gcc -o unit_test src/decoding.c src/encoding.c src/list.c src/tree.c src/unit.c -Iinc -lcunit
+> ```
+>   Logo após isso, pode executar o seguinte comando:
+> ```
+>         ./unit_test
   </p>
 
 
