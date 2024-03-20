@@ -27,12 +27,13 @@ int main() {
         // Lista encadeada para armazenar as frequencias em ordem crescente
         struct Node* list_frequency = createList();
 
+        // Abre para leitura dos bytes do arquivo
         archive = fopen(file_path, "rb");
 
         unsigned long long int size1 = sizeArchive(archive);
 
         strcat(file_path,".huff");
-        // Abre o arquivo para leitura
+        // Abre o arquivo para escrita
         FILE *archiveOut = fopen(file_path,"wb");
 
         if (archiveOut == NULL)
