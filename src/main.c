@@ -1,8 +1,8 @@
 #include <stdio.h>
-#include <list.h>
-#include <tree.h>
-#include <encoding.h>
-#include <decoding.h>
+#include <lista.h>
+#include <arvore.h>
+#include <compactacao.h>
+#include <descompactacao.h>
 
 #define MAX 100
 
@@ -15,77 +15,89 @@ int main() {
     printf("OPÇÃO: ");
     scanf("%d",&i);
     if(i == 1){
-        FILE *archive;
-
-        char file_path[MAX]; // Array que armazena o nome do arquivo
-
-        int currentSize = 0;
+        FILE *arquivo;
+        char caminho[MAX]; // Array que armazena o nome do arquivo
+        int tamanho_atual = 0;
 
         printf("Digite o caminho da pasta do arquivo: ");
-
-        scanf("%s", file_path);
-        // Lista encadeada para armazenar as frequencias em ordem crescente
-        struct Node* list_frequency = createList();
+        scanf("%s", caminho);
+        // Inicialização da lista encadeada para armazenar as frequencias em ordem crescente
+        struct Node* lista_frequencia = createList();
 
         // Abre para leitura dos bytes do arquivo
-        archive = fopen(file_path, "rb");
+        arquivo = fopen(caminho, "rb");
+        unsigned long long int tamanho_1 = sizeArchive(arquivo);
+        
+        // Bloco de código para leitura e armazenamento da extensao do nosso arquivo +condição de max de 6 linhas:32-45
+        char extensao[6];
+        int tam_ext = -1;
+        char *cursor = strrchr(caminho, '.');
+        while(*cursor != '\0'){
+            extensao[tam_ext + 1] = *cursor;
+            cursor++;
+            tam_ext++;
+        }
+        if(tam_ext > 6){
+            printf("Tamanho de extensão de arquivo inválida\nTamanho máximo = 6, Tamanho fornecido = %d\n", tam_ext);
+            printf("\n Encerrando programa. . . \n");
+            return 1;
+        }
 
-        unsigned long long int size1 = sizeArchive(archive);
+        // Remove a extensão do arquivo e adiciona .huff
+        char *remove = strrchr(caminho,'.');
+        if(remove != NULL) *(remove) = '\0';
+        strcat(caminho,".huff");
 
-        strcat(file_path,".huff");
         // Abre o arquivo para escrita
-        FILE *archiveOut = fopen(file_path,"wb");
-
-        if (archiveOut == NULL)
+        FILE *arquivo_saida = fopen(caminho,"wb");
+        if (arquivo_saida == NULL)
         {
             perror("Erro ao abrir o arquivo");
             return 1;
         }
         // Caso de erro na leitura do arquivo
-        if (archive == NULL)
+        if (arquivo == NULL)
         {
             perror("Erro ao abrir o arquivo");
             return 1;
-        } 
-        int frequency[256] = {0};
+        }
 
-        getFrequency(archive,frequency);
+        // Array armazenando a frequencia dos bytes
+        int frequencia_bytes[256] = {0};
 
-        insertionFrequency(&list_frequency, frequency,&currentSize);
+        // Função que conta essa frequencia de bytes e armazena no nosso array
+        adquirirFrequencia(arquivo,frequencia_bytes);
 
-        huffmanTree(&list_frequency,&currentSize);
+        // Função para inserir a frequencia em uma lista encadeada, a partir do nosso array frequencia_bytes
+        inserirFrequencia(&lista_frequencia, frequencia_bytes,&tamanho_atual);
 
-        BitHuff bithuff,table[256];
+        // Função para montar nossa árvore partindo da nossa lista encadeada que foi ordenada do menor para o maior
+        arvoreDeHuffman(&lista_frequencia,&tamanho_atual);
 
-        bithuff.bitH = 0;
+        // Linha 78-82, são inicializações das nossas variáveis e da nossa tabela de códigos tudo em 0 essencialmente para trabalharmos em cima disso
+        BitHuff byte_de_huffman,tabela_codigos[256];
+        byte_de_huffman.bitH = 0;
+        byte_de_huffman.size = 0;
+        memset(tabela_codigos,0,sizeof(BitHuff) * 256);
+        construirTabelaCodigos(lista_frequencia,tabela_codigos,byte_de_huffman);
 
-        bithuff.size = 0;
+        // Linhas 85-88 escrevemos o cabeçalho do nosso arquivo compactado
+        escreverPrimeiroByte(arquivo_saida,tamanhoLixo(frequencia_bytes,tabela_codigos),tamanhoArvore(lista_frequencia));
+        escreverSegundoByte(arquivo_saida,tamanhoArvore(lista_frequencia));
+        escreverArvore(arquivo_saida,lista_frequencia);
+        escreverExt(arquivo_saida,extensao, tam_ext);
 
-        memset(table,0,sizeof(BitHuff) * 256);
+        // Voltando o cursor para o começo do arquivo principal e assim começando a codificar os bytes desse arquivo
+        fseek(arquivo, 0, SEEK_SET);
+        escreverBytesCodificados(arquivo,arquivo_saida,tabela_codigos,tamanhoLixo(frequencia_bytes,tabela_codigos));
 
-        buildTable(list_frequency,table,bithuff);
+        unsigned long long int tamanho2 = sizeArchive(arquivo_saida);
+        fclose(arquivo);
+        fclose(arquivo_saida);
 
-        setFirstByte(archiveOut,trashsize(frequency,table),treeSize(list_frequency));
-
-        setSecondByte(archiveOut,treeSize(list_frequency));
-
-        setTree(archiveOut,list_frequency);
-
-        fseek(archive, 0, SEEK_SET);
-
-        setBytes(archive,archiveOut,table,trashsize(frequency,table));
-
-        unsigned long long int size2 = sizeArchive(archiveOut);
-
-        fclose(archive);
-
-        fclose(archiveOut);
-
-        printf("TAMANHO DO ARQUIVO ORIGINAL EM BYTES: %llu\n",size1);
-
-        printf("TAMANHO DO ARQUIVO COMPACTADO EM BYTES: %llu\n",size2);
-
-        if(size1 > size2){
+        printf("TAMANHO DO ARQUIVO ORIGINAL EM BYTES: %llu\n",tamanho_1);
+        printf("TAMANHO DO ARQUIVO COMPACTADO EM BYTES: %llu\n",tamanho2);
+        if(tamanho_1 > tamanho2){
             printf("A COMPRESSÃO SE DEMONSTROU EFICIENTE\n");
         }
         else{
@@ -93,41 +105,55 @@ int main() {
         }
     }
     else if(i == 2){
-        FILE *archive;
-
-        FILE *archiveOut;
-
-        char file_path[MAX];
-
+        // Iniciando nossos arquivos que serão trabalhados e armazenando caminho do compactado
+        FILE *arquivo_compactado;
+        FILE *arquivo_saida;
+        char caminho[MAX];
         printf("Digite o caminho da pasta do arquivo: ");
+        scanf("%s", caminho);
 
-        scanf("%s", file_path);
+        // Finalmente abrindo nosso arquivo compactado em modo de leitura de bits
+        arquivo_compactado = fopen(caminho, "rb");
 
-        archive = fopen(file_path, "rb");
+        // Removendo o ".huff" para posteriormente adicionarmos a extensão original do arquivo que está no cabeçalho
+        char *remove = strrchr(caminho,'.');
+        if(remove != NULL) *(remove + 1) = '\0';        
 
-        char *remove = strrchr(file_path,'.');
+        // Leitura do nosso cabeçalho (2 primeiros bytes)
+        short int tamanho_lixo = tamanhoLixoArquivoCompactado(arquivo_compactado);
+        short int tamanho_arvore = tamanhoArvoreArquivoCompactado(arquivo_compactado);
 
-        if(remove != NULL) *remove = '\0';
+        // Calculando tamanho do arquivo e desconsiderando o cabeçalho
+        unsigned long long int tamanho_arquivo_compactado = sizeArchive(arquivo_compactado);
+        tamanho_arquivo_compactado -= 2;
+        tamanho_arquivo_compactado -= tamanho_arvore;
 
-        archiveOut = fopen(file_path, "wb");
+        // Monta nossa árvore de huffman que foi escrita no cabeçalho
+        Node *arvore_de_huffman = montarArvore(arquivo_compactado,&tamanho_arvore);
 
-        short int trash = trashSizeCompactFile(archive);
+        /* 
+            Cálculo do tamanho da extensão do arquivo, armazenamento dessa extensão a partir do arquivo compactado em um array
+            após isso concatenamos na nossa string do caminho do arquivo a extensão original do arquivo
+            Linhas 139-150
+        */
+        int tamanho_extensao = tamanhoExtensaoArqCompactado(arquivo_compactado);
+        tamanho_arquivo_compactado -= (tamanho_extensao + 1);
+        if(tamanho_extensao > 6){
+            printf("Tamanho de extensão de arquivo inválida\nTamanho máximo = 6, Tamanho fornecido = %d\n", tamanho_extensao);
+            printf("\n Encerrando programa. . . \n");
+            return 1;
+        }
+        char extensao[tamanho_extensao+1];
+        recuperarExtensaoArqCompactado(arquivo_compactado, extensao, tamanho_extensao);
+        strcat(caminho, extensao);
 
-        short int treeSize = treeSizeCompactFile(archive);
+        arquivo_saida = fopen(caminho, "wb");
 
-        unsigned long long int archiveSize = sizeArchive(archive);
-
-        archiveSize -= 2;
-
-        archiveSize -= treeSize;
-
-        Node *huffTree = getTree(archive,&treeSize);
-
-        setBytesBack(archive,archiveOut,trash,archiveSize,huffTree);
-
-        fclose(archive);
+        // Função autoexplicativa, Escreve os Bytes do arquivo original a partir do arquivo compactado
+        escreverBytesOriginais(arquivo_compactado,arquivo_saida,tamanho_lixo,tamanho_arquivo_compactado,arvore_de_huffman);
         
-        fclose(archiveOut);
+        fclose(arquivo_compactado);
+        fclose(arquivo_saida);
     }
     
     return 0;

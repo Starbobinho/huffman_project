@@ -30,7 +30,7 @@ A codificação de Huffman é um método de compressão que usa as probabilidade
 > ```
 > Já na pasta da aplicação em seu terminal, digite o seguinte comando:
 > ```
-> 	gcc -Iinc src/decoding.c src/encoding.c src/tree.c src/list.c src/main.c -o zip/zip
+> 	gcc -Iinc src/descompactacao.c src/compactacao.c src/arvore.c src/lista.c src/main.c -o zip/zip
 > ```
 > 	Logo depois, basta executar com o seguinte comando:
 > ```
