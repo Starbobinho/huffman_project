@@ -1,3 +1,7 @@
 {
-    "C_Cpp.errorSquiggles": "enabledIfIncludesResolve"
+    "C_Cpp.errorSquiggles": "enabledIfIncludesResolve",
+    "files.associations": {
+        "arvore.h": "c",
+        "lista.h": "c"
+    }
 }
